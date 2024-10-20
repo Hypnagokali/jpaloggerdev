@@ -6,12 +6,13 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.sql.Connection;
+import java.util.Collections;
+import java.util.List;
 
+import de.xenaduservices.jpalogger.annotations.AnnotationUtil;
 import de.xenaduservices.jpalogger.repos.AuthorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import org.hibernate.type.internal.ParameterizedTypeImpl;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -30,30 +31,26 @@ public class ConnectionLoggingInvocationHandler implements InvocationHandler {
     @Override
     public Object invoke(Object o, Method method, Object[] args) throws Throwable {
         if ( "prepareStatement".equals( method.getName() ) ) {
-            String entityName = getTestEntityName();
+            List<String> entityNames = getEntityNamesByAnnotation();
 
-            if ( args != null && args.length > 0 && entityName != null ) {
-                String sql = (String) args[0];
-                if (sql.contains( " " + entityName + " ")) {
-                log.info( "{}", args[0] );
+            if ( args != null && args.length > 0 && !entityNames.isEmpty() ) {
+
+                for ( String entityName : entityNames ) {
+                    String sql = (String) args[0];
+                    if (sql.contains( " " + entityName + " ")) {
+                        log.info( "{}", args[0] );
+                    }
                 }
+
             }
         }
 
         return method.invoke( connection, args );
     }
 
-    private static String getTestEntityName() throws NoSuchMethodException {
-        String entityName = null;
-        Method testMethod = AuthorRepository.class.getMethod( "findAllByBooksIsbnContaining", String.class );
-
-        Type[] actualTypeArguments = ( (ParameterizedType) testMethod.getGenericReturnType() ).getActualTypeArguments();
-
-        if (actualTypeArguments.length > 0) {
-            String typeName = actualTypeArguments[0].getTypeName();
-            int i = typeName.lastIndexOf( '.' );
-            entityName = typeName.substring( i + 1 ).toLowerCase();
-        }
-        return entityName;
+    private static List<String> getEntityNamesByAnnotation() throws NoSuchMethodException {
+        return AnnotationUtil.findAllEntityLoggingInfos().stream()
+            .map( EntityLoggingInfo::getEntityName )
+            .toList();
     }
 }

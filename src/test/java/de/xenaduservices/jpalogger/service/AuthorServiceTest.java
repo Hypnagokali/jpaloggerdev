@@ -1,15 +1,20 @@
 package de.xenaduservices.jpalogger.service;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
 import de.xenaduservices.jpalogger.data.Author;
 import de.xenaduservices.jpalogger.data.Book;
+import de.xenaduservices.jpalogger.logging.ConnectionLoggingInvocationHandler;
 import de.xenaduservices.jpalogger.repos.AuthorRepository;
-import de.xenaduservices.jpalogger.repos.BookRepository;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -23,8 +28,17 @@ class AuthorServiceTest {
     @Autowired
     AuthorRepository authorRepository;
 
+    MemoryLogAppender memoryLogAppender;
+
     @BeforeEach
     void setUp() {
+        Logger logger = (Logger) LoggerFactory.getLogger( ConnectionLoggingInvocationHandler.class );
+        memoryLogAppender = new MemoryLogAppender();
+        memoryLogAppender.setContext( (LoggerContext) LoggerFactory.getILoggerFactory() );
+        logger.setLevel( Level.DEBUG );
+        logger.addAppender(memoryLogAppender);
+        memoryLogAppender.start();
+
         Author king = authorRepository.save( new Author( "Stephen", "King" ) );
         Author straub = authorRepository.save( new Author( "Peter", "Straub" ) );
 
@@ -41,7 +55,7 @@ class AuthorServiceTest {
     @Test
     @Transactional
     void testBasicFunctionality() {
-        Set<Book> allBook = authorService.getAuthorsWhoHasWrittenABookContainingIsbn("45")
+        Set<Book> allBook = authorService.getAuthorsWhoHasWrittenABookContainingIsbn( "45" )
             .stream()
             .flatMap( author -> author.getBooks().stream() )
             .collect( Collectors.toSet() );
@@ -50,5 +64,23 @@ class AuthorServiceTest {
             .hasSize( 2 )
             .extracting( Book::getTitle )
             .containsExactly( "The Talisman", "The long walk" );
+    }
+
+    @Test
+    void entityBasedLogging() {
+        // e.g.: annotate an Entity with @LogQueries
+        List<String> authorLogs = memoryLogAppender.logContainsAll( "select", "from author" );
+        List<String> bookLogs = memoryLogAppender.logContainsAll( "select", "from book" );
+
+
+        assertThat( authorLogs ).isNotEmpty();
+        assertThat( bookLogs ).isEmpty();
+    }
+
+    @Test
+    void methodBasedLogging() {
+        // e.g.: annotate a repository-method with @LogQueries
+
+        assertThat( true ).isFalse();
     }
 }

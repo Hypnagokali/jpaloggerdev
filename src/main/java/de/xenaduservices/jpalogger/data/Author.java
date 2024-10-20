@@ -3,6 +3,7 @@ package de.xenaduservices.jpalogger.data;
 import java.util.HashSet;
 import java.util.Set;
 
+import de.xenaduservices.jpalogger.annotations.LogQueries;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -19,6 +20,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
+@LogQueries
 public class Author {
 
     @Id
